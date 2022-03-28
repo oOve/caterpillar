@@ -11,7 +11,7 @@
  ░                 ░              
  */
 
-let module_name = "caterpillar";
+ 
 
 
 // Bind to pre-update to pick up those mirrors moving away from a beam
@@ -30,7 +30,10 @@ Hooks.on('deleteToken', (token, options, user_id)=>{
 // Let's grab those token updates
 Hooks.on('updateToken', (token, change, options, user_id)=>{
   if (!game.user.isGM)return true;
+  if (token.getFlag("caterpillar", "is_head")){
+    // Go on and move its body.
 
+  }
   console.log('caterpillar update token:', token, change, options, user_id);
 });
 
@@ -41,7 +44,7 @@ Hooks.on('updateToken', (token, change, options, user_id)=>{
 
 // Settings:
 Hooks.once("init", () => {
-  game.settings.register(module_name, "snap_to_grid", {
+  game.settings.register("caterpillar", "snap_to_grid", {
     name: "Snap to grid",
     hint: "Should the tokens automatically snap to grid, or preserve length",
     scope: 'world',
@@ -74,8 +77,8 @@ Hooks.on("renderTokenConfig", (app, html) => {
   body_token.type = "file";
   body_token.title = 'The token image for its body';  
   // Insert the flags current value into the input box  
-  if (app.token.getFlag(module_name, 'body_token')){
-    body_token.value=app.token.getFlag(module_name, 'body_token');
+  if (app.token.getFlag("caterpillar", 'body_token')){
+    body_token.value=app.token.getFlag("caterpillar", 'body_token');
   }
   formFields.append(body_token);
   
@@ -86,8 +89,8 @@ Hooks.on("renderTokenConfig", (app, html) => {
   rear_token.type = "file";
   rear_token.title = 'The token image for its rear, leave empty for no rear.';
   formFields.append(rear_token);
-  if ( app.token.getFlag(module_name, 'rear_token')){
-    rear_token.value = app.token.getFlag(module_name, 'rear_token');
+  if ( app.token.getFlag("caterpillar", 'rear_token')){
+    rear_token.value = app.token.getFlag("caterpillar", 'rear_token');
   }
   
   
