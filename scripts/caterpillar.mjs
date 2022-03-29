@@ -12,32 +12,103 @@
  */
 
  const MOD_NAME = "caterpillar";
+
  
 
 
-// Bind to pre-update to pick up those mirrors moving away from a beam
-Hooks.on('preUpdateToken', (token, change, options, user_id)=>{
-  if (!game.user.isGM)return true;
 
+
+function rotate_angle_from_vec(old_pos, new_pos){
+    let diff = {x:new_pos.x-old_pos.x,
+                y:new_pos.y-old_pos.y};
+    return 90 + Math.toDegrees( Math.atan2( diff.y, diff.x ) );
+}
+ 
+
+
+Hooks.on('preUpdateToken', (token, change, options, user_id)=>{
+ 
+  if (token.getFlag(MOD_NAME, 'enabled') && (change.x||change.y) ){
+    // This is the head.
+
+    let prev_pos = {x:token.data.x, y:token.data.y};
+    let new_pos = duplicate(prev_pos);
+    if (change.x){new_pos.x = change.x;}
+    if (change.y){new_pos.y = change.y;}
+    let updates = [];
+
+    let angle = rotate_angle_from_vec(prev_pos, new_pos);
+    // update the head to point in the direction of the movement.
+    updates.push({_id:token.id, rotation: angle});
+    let tail_ids = token.getFlag(MOD_NAME, 'tail_items');
+        
+    for ( let tail_id of tail_ids){
+        let tail = canvas.tokens.get(tail_id);
+        let next_pos = {x:tail.x, y:tail.y};
+        let angle = rotate_angle_from_vec(next_pos, prev_pos);
+        updates.push({
+          _id: tail.id,
+          x : prev_pos.x,
+          y : prev_pos.y,
+          rotation: angle
+        });
+        prev_pos = next_pos;        
+    }
+    canvas.scene.updateEmbeddedDocuments('Token', updates);
+  }  
 });
+
+
 
 // Delete token
 Hooks.on('deleteToken', (token, options, user_id)=>{
   if (!game.user.isGM)return true;
 
+  if (token.getFlag(MOD_NAME, 'tail_items')){
+    let tail = token.getFlag(MOD_NAME, 'tail_items');
+    canvas.scene.deleteEmbeddedDocuments('Token', tail);
+  }
+
 });
+
+
+
+
+// Create token
+Hooks.on('createToken', (token, options, user_id)=>{
+  if (!game.user.isGM)return true;
+  if (token.getFlag(MOD_NAME, "enabled") && token.getFlag(MOD_NAME, 'length')){
+    // We need to create a catepillar
+    console.log("Creating Catepillar", token, options, user_id);
+    let len = token.getFlag(MOD_NAME, 'length');
+    let tail = [];
+    
+    for (let i = 1; i <= len; ++i){
+      let t = duplicate(token);
+      t.y += (i) * canvas.grid.size;
+      t.flags.caterpillar.tail = true;
+      t.flags.caterpillar.tail_index = i;
+      t.flags.caterpillar.enabled = false;
+      t.img = token.getFlag(MOD_NAME, (i<len)?'body_token':'rear_token' );
+      tail.push(t);
+    }
+    canvas.scene.createEmbeddedDocuments("Token", tail).then((tokens)=>{
+      token.setFlag(MOD_NAME, 'tail_items', tokens.map( tok=>tok.id ) );
+    });
+  }
+});
+
 
 
 // Let's grab those token updates
+/*
 Hooks.on('updateToken', (token, change, options, user_id)=>{
   if (!game.user.isGM)return true;
-  if (token.getFlag(MOD_NAME, "is_head")){
+  if (token.getFlag(MOD_NAME, "enabled")){
     // Go on and move its body.
-
-  }
-  console.log('caterpillar update token:', token, change, options, user_id);
+  }  
 });
-
+*/
 
 
 
@@ -72,10 +143,12 @@ function imageSelector( app, flag_name, title ){
   button.type = "button";
   button.title = "Browse Files";
   button.tabindex = "-1";
+  button.dataset.target = data_path;
   button['data-type'] = "imagevideo";
   button['data-target'] = data_path;
   //button.onclick = _activateFilePicker;
-  button.onclick = app._activateFilePicker;
+  //button.onclick = app._activateFilePicker;
+  button.onclick = app._activateFilePicker.bind(app);
   
   let bi = document.createElement('i');
   bi.classList.add('fas');
