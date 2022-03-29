@@ -12,7 +12,6 @@ Drag your actor onto the scene, and it will automatically generate all the tail 
 
 [![Caterpillar](http://img.youtube.com/vi/U4Kku983B4k/0.jpg)](http://www.youtube.com/watch?v=U4Kku983B4k "Caterpillar")
 
-If you like what i do feel free to support me at https://www.patreon.com/drO_o
+Do you like this module?; then please support me at [Patreon](https://www.patreon.com/drO_o).
 
-Do you like to show off your creations, or ask questions about the module feel free to drop in at my discord channel: https://discord.gg/5CCAhsKFDp
-
+Would you like to show off your creations or ask questions about the module feel free to drop in at my [discord channel](https://discord.gg/5CCAhsKFDp). 
