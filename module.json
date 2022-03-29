@@ -13,7 +13,7 @@
         }],
     "dependencies":[],
     "socket": false,
-    "scripts": ["./scripts/caterpillar.js"],    
+    "esmodules": ["./scripts/caterpillar.mjs"],    
     "url": "https://github.com/oOve/caterpillar",
     "download": "https://github.com/oOve/caterpillar/archive/0.0.9.zip",
     "manifest": "https://github.com/oOve/caterpillar/releases/latest/download/module.json",
