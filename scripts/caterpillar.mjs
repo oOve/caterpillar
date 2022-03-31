@@ -28,8 +28,21 @@ function rotate_angle_from_vec(old_pos, new_pos){
 
 Hooks.on('preUpdateToken', (token, change, options, user_id)=>{
  
-  if (token.getFlag(MOD_NAME, 'enabled') && (change.x||change.y) ){
+  if(!change.x && !change.y){
+    return;
+  }
+
+  if (token.getFlag(MOD_NAME, 'enabled')){
     // This is the head.
+    let tail_ids = token.getFlag(MOD_NAME, 'tail_items');
+    const ENDTAIL_ID = tail_ids[tail_ids.length-1];
+
+    //if the tail token is selected do not try and move everything! Bad things such as infinte loops may happen!
+    for (let t of canvas.tokens.controlled){
+      if(t.id === ENDTAIL_ID){
+       return;
+      }
+    }
 
     let prev_pos = {x:token.data.x, y:token.data.y};
     let new_pos = duplicate(prev_pos);
@@ -40,8 +53,8 @@ Hooks.on('preUpdateToken', (token, change, options, user_id)=>{
     let angle = rotate_angle_from_vec(prev_pos, new_pos);
     // update the head to point in the direction of the movement.
     updates.push({_id:token.id, rotation: angle});
-    let tail_ids = token.getFlag(MOD_NAME, 'tail_items');
-        
+    
+
     for ( let tail_id of tail_ids){
         let tail = canvas.tokens.get(tail_id);
         let next_pos = {x:tail.x, y:tail.y};
@@ -52,10 +65,59 @@ Hooks.on('preUpdateToken', (token, change, options, user_id)=>{
           y : prev_pos.y,
           rotation: angle
         });
+        prev_pos = next_pos;      
+    }
+    canvas.scene.updateEmbeddedDocuments('Token', updates);
+  }
+  else if (token.getFlag(MOD_NAME, 'tail_index') && token.getFlag(MOD_NAME, 'tail_index') === token.getFlag(MOD_NAME, 'length')){
+    //this is the tail
+    
+    const HEAD_ID = token.getFlag(MOD_NAME, 'head_id');
+    const HEAD_TOKEN = canvas.scene.tokens.get(HEAD_ID);
+
+
+    //only use this function if the tail is selected and not the head. Otherwise infinte loops of dooooom!
+    let isTailSelected = false
+    for (let t of canvas.tokens.controlled){
+      if(t.id === HEAD_ID){
+        return;
+      }
+      if(t.id === token.id){
+        isTailSelected = true;
+      }
+    }
+    if(!isTailSelected){
+      return
+    }
+
+    let prev_pos = {x:token.data.x, y:token.data.y};
+    let new_pos = duplicate(prev_pos);
+    if (change.x){new_pos.x = change.x;}
+    if (change.y){new_pos.y = change.y;}
+    let updates = [];
+
+    let angle = rotate_angle_from_vec(new_pos, prev_pos);
+    // update the tail to point in the direction of the movement.
+    updates.push({_id:token.id, rotation: angle});
+    let tail_ids = [...HEAD_TOKEN.getFlag(MOD_NAME, 'tail_items')];
+    tail_ids.pop();
+    tail_ids.reverse();
+    tail_ids.push(HEAD_ID);
+        
+    for ( let tail_id of tail_ids){
+        let tail = canvas.tokens.get(tail_id);
+        let next_pos = {x:tail.x, y:tail.y};
+        let angle = rotate_angle_from_vec(prev_pos, next_pos);
+        updates.push({
+          _id: tail.id,
+          x : prev_pos.x,
+          y : prev_pos.y,
+          rotation: angle
+        });
         prev_pos = next_pos;        
     }
     canvas.scene.updateEmbeddedDocuments('Token', updates);
-  }  
+  }
 });
 
 
@@ -89,6 +151,7 @@ Hooks.on('createToken', (token, options, user_id)=>{
       t.flags.caterpillar.tail = true;
       t.flags.caterpillar.tail_index = i;
       t.flags.caterpillar.enabled = false;
+      t.flags.caterpillar.head_id = token.id
       t.img = token.getFlag(MOD_NAME, (i<len)?'body_token':'rear_token' );
       tail.push(t);
     }
