@@ -259,7 +259,7 @@ Hooks.on("renderTokenConfig", (app, html) => {
   formGroup.append(formFields);
   const label1 = document.createElement('label');
   label1.textContent = "Enable";
-  formGroup.append(label1);
+  formFields.append(label1);
 
   const enableBox = document.createElement("input");
   enableBox.name = 'flags.'+MOD_NAME+'.enabled';
@@ -272,7 +272,7 @@ Hooks.on("renderTokenConfig", (app, html) => {
 
   const label2 = document.createElement('label');
   label2.textContent = 'Length';
-  formGroup.append(label2);
+  formFields.append(label2);
   const cat_len = document.createElement('input');
   cat_len.name = 'flags.'+MOD_NAME+'.length';
   cat_len.type = 'number';
@@ -280,7 +280,7 @@ Hooks.on("renderTokenConfig", (app, html) => {
   if(app.token.getFlag(MOD_NAME, 'length')){
     cat_len.value=app.token.getFlag(MOD_NAME, 'length');
   }
-  formGroup.append(cat_len);
+  formFields.append(cat_len);
   
   const cat_body = imageSelector(app, 'body_token', "Token for Caterpillar body");
   const cat_rear = imageSelector(app, 'rear_token', "Token for Caterpillar rear");
