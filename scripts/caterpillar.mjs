@@ -13,7 +13,6 @@
 
  const MOD_NAME = "caterpillar";
 
- 
 
 
 
@@ -23,20 +22,160 @@ function rotate_angle_from_vec(old_pos, new_pos){
                 y:new_pos.y-old_pos.y};
     return 90 + Math.toDegrees( Math.atan2( diff.y, diff.x ) );
 }
- 
 
 
-Hooks.on('preUpdateToken', (token, change, options, user_id)=>{
  
+function isHead(token){
+  return token.getFlag(MOD_NAME, 'enabled');
+}
+
+function vNeg(p){
+  return {x:-p.x, y:-p.y};
+}
+function vAdd(p1, p2){
+  return {x:p1.x+p2.x, y:p1.y+p2.y };
+}
+function vSub(p1, p2){
+  return {x:p1.x-p2.x, y:p1.y-p2.y };
+}
+function vMult(p,v){
+  return {x:p.x*v, y: p.y*v};  
+}
+function vDot(p1, p2){
+  return p1.x*p2.x + p1.y*p2.y;
+}
+function vLen(p){
+  return Math.sqrt(p.x**2 + p.y**2);
+}
+function vNorm(p){
+  return vMult(p, 1.0/vLen(p));
+}
+function vAngle(p){
+  return 90+Math.toDegrees(Math.atan2(p.y, p.x));
+}
+
+class SimpleSpline{
+  constructor(points, smoothness=0.0){
+    this.p = points;
+    this.smoothness = smoothness;
+    this.lengths = [];
+    for (let i = 1; i < this.len; ++i){
+      this.lengths.push( vLen(vSub(this.p[i-1], this.p[i])) );
+    }
+  }
+  parametricLength(){
+    return this.lengths.reduce((p, a)=>p+a,0);
+  }
+  get len (){
+    return this.p.length;
+  }
+  get plen(){
+    return this.parametricLength();
+  }
+
+  // Position at parametric position t
+  parametricPosition( t ){
+    if (this.len<2){return this.p[0];}    
+    let len = 0;
+    for (let i = 1; i < this.len; ++i){
+      let nlen = this.lengths[i-1];
+      if (len+nlen >= t){
+        let nfrac = (t-len)/(nlen);//normalized fraction
+        // returning (1-nt)*prev + nt*cur
+        return vAdd(vMult(this.p[i-1], 1-nfrac), vMult(this.p[i], nfrac) );
+      }
+      len += nlen;
+    }
+    // we have gone past our parametric length, clamp at last point
+    return this.p[this.len-1];
+  }
+
+  #iNorm(i){
+    if(i<1){
+      return vNorm(vSub(this.p[0], this.p[1]));
+    }
+    if(i > (this.len-2)){
+      // last (or past last) point, return (last - next to last)
+      return vNorm(vSub(this.p[this.len-2], this.p[this.len-1]));
+    }
+    return vNorm( vSub(this.p[i-1], this.p[i+1]));
+  }
+
+  // Derivative at parametric position t
+  derivative(t){
+    if (t<=0){ 
+      return this.#iNorm(0);
+    }
+    let len = 0;
+    for (let i = 1; i < this.len; ++i){
+      let nlen = this.lengths[i-1];
+      if ((len+nlen) >= t){
+        let nfrac = (t-len)/(nlen);//normalized fraction
+        let p = this.#iNorm(i-1);
+        let n = this.#iNorm(i);
+        return vNorm( vAdd(vMult(p,1-nfrac), vMult(n,nfrac)) );
+      }
+      len += nlen;
+    }
+    return this.#iNorm(this.len);
+  }
+}
+
+function prepend(value, array) {
+  var newArray = array.slice();
+  newArray.unshift(value);
+  return newArray;
+}
+
+
+Hooks.on('preUpdateToken', (token, change, options, user_id)=>{ 
   if(!change.x && !change.y){
+    // No change that modifies the caterpillar
     return;
   }
 
-  if (token.getFlag(MOD_NAME, 'enabled')){
+
+  if (isHead(token)){
     // This is the head.
+    
     let tail_ids = token.getFlag(MOD_NAME, 'tail_items');
     const ENDTAIL_ID = tail_ids[tail_ids.length-1];
+    
+    let caterpillar = tail_ids.map(id=>canvas.tokens.get(id));
+    let positions = caterpillar.map((part)=>{return {x:part.data.x, y:part.data.y};});
 
+    let prev_pos = {x:token.data.x, y:token.data.y};
+    let new_pos = duplicate(prev_pos);
+    if (change.x){new_pos.x = change.x;}
+    if (change.y){new_pos.y = change.y;}
+    positions = prepend(new_pos, positions);
+
+    //console.error("Positions:");
+    //console.error(positions);    
+    let spline = new SimpleSpline(positions);
+    //console.error("lengths:", spline.lengths);
+    //console.error("Parametric length:", spline.parametricLength());
+
+    window.my_spline = spline;
+
+    let updates = [];
+    updates.push({_id: token.id, rotation: vAngle(spline.derivative(0)) });
+
+    for (let i=1; i<positions.length; ++i){
+      let t = i*(caterpillar[0].hitArea.width)/1.5;
+      let npos = spline.parametricPosition(t);
+      console.warn("T:", t, " pos:", npos);
+      updates.push( 
+        { 
+          _id : tail_ids[i-1], 
+          x: npos.x,
+          y: npos.y,
+          rotation: vAngle(spline.derivative(t))
+        });
+    }
+    canvas.scene.updateEmbeddedDocuments('Token', updates);
+  }
+    /*
     //if the tail token is selected do not try and move everything! Bad things such as infinte loops may happen!
     for (let t of canvas.tokens.controlled){
       if(t.id === ENDTAIL_ID){
@@ -52,8 +191,7 @@ Hooks.on('preUpdateToken', (token, change, options, user_id)=>{
 
     let angle = rotate_angle_from_vec(prev_pos, new_pos);
     // update the head to point in the direction of the movement.
-    updates.push({_id:token.id, rotation: angle});
-    
+    updates.push({_id:token.id, rotation: angle});    
 
     for ( let tail_id of tail_ids){
         let tail = canvas.tokens.get(tail_id);
@@ -118,7 +256,10 @@ Hooks.on('preUpdateToken', (token, change, options, user_id)=>{
     }
     canvas.scene.updateEmbeddedDocuments('Token', updates);
   }
+
+  */
 });
+
 
 
 
