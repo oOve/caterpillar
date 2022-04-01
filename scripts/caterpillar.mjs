@@ -176,8 +176,6 @@ Hooks.on('preUpdateToken', (token, change, options, user_id)=>{
     const HEAD_ID = (ihead)?token.id:token.getFlag(MOD_NAME, 'head_id');
     let head_doc = (ihead)?token: canvas.tokens.get(HEAD_ID).document;
 
-    console.warn("HEAD ID", HEAD_ID);
-
     // This is either the head or the tail        
     let tail_ids = head_doc.getFlag(MOD_NAME, 'tail_items');    
     
@@ -406,7 +404,6 @@ Hooks.on("renderTokenConfig", (app, html) => {
 
   // Set the apps height correctly
   app.setPosition();
-
-  console.log(app);
+  
 });
 
