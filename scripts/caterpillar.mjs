@@ -132,7 +132,6 @@ function isTail(token){
     return index == length;
   }
   catch(err){
-    console.warn(err);
     return false;
   }
 }
