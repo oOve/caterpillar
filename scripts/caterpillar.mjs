@@ -25,9 +25,6 @@ function rotate_angle_from_vec(old_pos, new_pos){
 
 
  
-function isHead(token){
-  return token.getFlag(MOD_NAME, 'enabled');
-}
 
 function vNeg(p){
   return {x:-p.x, y:-p.y};
@@ -127,19 +124,65 @@ function prepend(value, array) {
   return newArray;
 }
 
+function isHead(token){
+  return token.getFlag(MOD_NAME, 'enabled');
+}
+function isTail(token){
+  try{
+    let head = canvas.tokens.get( isHead(token)?token.id: token.getFlag(MOD_NAME, 'head_id'));
+    let length = head.document.getFlag(MOD_NAME, 'length');
+    let index = token.getFlag(MOD_NAME, 'tail_index');
+    return index == length;
+  }
+  catch(err){
+    console.warn(err);
+    return false;
+  }
+}
+
+function* catepillarIterator(length, step, reverse=false){
+  let p = (reverse)?length:0;
+  while (true){
+    yield p;
+    p += (reverse)?-step : step;
+  }
+}
+function* reversableIterator(len, reverse=false){
+  let start = (reverse)?len-1: 0;
+  let step = (reverse)?-1:1;
+  let end = (reverse)?-1:len;
+  for (let i = start; i!=end; i+=step){
+    yield i;
+  }
+}
+/*
+ri = reversableIterator(10, true);
+for (const i of ri){console.warn(i)}
+console.warn('---------');
+ii = reversableIterator(10);
+for (const i of ii){console.warn(i)}
+*/
 
 Hooks.on('preUpdateToken', (token, change, options, user_id)=>{ 
   if(!change.x && !change.y){
     // No change that modifies the caterpillar
     return;
   }
+  if (options.worm_triggered){
+    return true;
+  }  
 
+  let ihead = isHead(token);
+  let itail = isTail(token);
 
-  if (isHead(token)){
-    // This is the head.
-    
-    let tail_ids = token.getFlag(MOD_NAME, 'tail_items');
-    const ENDTAIL_ID = tail_ids[tail_ids.length-1];
+  if (ihead || itail){    
+    const HEAD_ID = (ihead)?token.id:token.getFlag(MOD_NAME, 'head_id');
+    let head_doc = (ihead)?token: canvas.tokens.get(HEAD_ID).document;
+
+    console.warn("HEAD ID", HEAD_ID);
+
+    // This is either the head or the tail        
+    let tail_ids = head_doc.getFlag(MOD_NAME, 'tail_items');    
     
     let caterpillar = tail_ids.map(id=>canvas.tokens.get(id));
     let positions = caterpillar.map((part)=>{return {x:part.data.x, y:part.data.y};});
@@ -148,116 +191,46 @@ Hooks.on('preUpdateToken', (token, change, options, user_id)=>{
     let new_pos = duplicate(prev_pos);
     if (change.x){new_pos.x = change.x;}
     if (change.y){new_pos.y = change.y;}
-    positions = prepend(new_pos, positions);
 
-    //console.error("Positions:");
-    //console.error(positions);    
+    if (ihead){
+      positions = prepend(new_pos, positions);
+    }else{
+      positions.push(new_pos);
+    }
+
+    let stepSize = (caterpillar[0].hitArea.width)/1.5;
     let spline = new SimpleSpline(positions);
-    //console.error("lengths:", spline.lengths);
-    //console.error("Parametric length:", spline.parametricLength());
-
-    window.my_spline = spline;
-
     let updates = [];
-    updates.push({_id: token.id, rotation: vAngle(spline.derivative(0)) });
 
-    for (let i=1; i<positions.length; ++i){
-      let t = i*(caterpillar[0].hitArea.width)/1.5;
+    // This is the head
+    //updates.push({_id: token.id, rotation: vAngle(spline.derivative(0)) });
+    let c_iter = catepillarIterator(spline.plen, stepSize, itail);
+    let i_iter = reversableIterator(positions.length, itail);
+    
+    for (const i of i_iter){
+      let t = c_iter.next().value;
       let npos = spline.parametricPosition(t);
-      console.warn("T:", t, " pos:", npos);
-      updates.push( 
-        { 
-          _id : tail_ids[i-1], 
+      let angle = vAngle(spline.derivative(t));
+      if (Number.isNaN(angle)){angle=0;}
+      
+      let id;
+      if (i==0){     
+        id=HEAD_ID;
+      }else{
+        id=tail_ids[i-1];
+      }
+      updates.push({ 
+          _id : id, 
           x: npos.x,
           y: npos.y,
-          rotation: vAngle(spline.derivative(t))
-        });
-    }
-    canvas.scene.updateEmbeddedDocuments('Token', updates);
-  }
-    /*
-    //if the tail token is selected do not try and move everything! Bad things such as infinte loops may happen!
-    for (let t of canvas.tokens.controlled){
-      if(t.id === ENDTAIL_ID){
-       return;
-      }
-    }
-
-    let prev_pos = {x:token.data.x, y:token.data.y};
-    let new_pos = duplicate(prev_pos);
-    if (change.x){new_pos.x = change.x;}
-    if (change.y){new_pos.y = change.y;}
-    let updates = [];
-
-    let angle = rotate_angle_from_vec(prev_pos, new_pos);
-    // update the head to point in the direction of the movement.
-    updates.push({_id:token.id, rotation: angle});    
-
-    for ( let tail_id of tail_ids){
-        let tail = canvas.tokens.get(tail_id);
-        let next_pos = {x:tail.x, y:tail.y};
-        let angle = rotate_angle_from_vec(next_pos, prev_pos);
-        updates.push({
-          _id: tail.id,
-          x : prev_pos.x,
-          y : prev_pos.y,
           rotation: angle
         });
-        prev_pos = next_pos;      
-    }
-    canvas.scene.updateEmbeddedDocuments('Token', updates);
-  }
-  else if (token.getFlag(MOD_NAME, 'tail_index') && token.getFlag(MOD_NAME, 'tail_index') === token.getFlag(MOD_NAME, 'length')){
-    //this is the tail
-    
-    const HEAD_ID = token.getFlag(MOD_NAME, 'head_id');
-    const HEAD_TOKEN = canvas.scene.tokens.get(HEAD_ID);
-
-
-    //only use this function if the tail is selected and not the head. Otherwise infinte loops of dooooom!
-    let isTailSelected = false
-    for (let t of canvas.tokens.controlled){
-      if(t.id === HEAD_ID){
-        return;
-      }
-      if(t.id === token.id){
-        isTailSelected = true;
-      }
-    }
-    if(!isTailSelected){
-      return
-    }
-
-    let prev_pos = {x:token.data.x, y:token.data.y};
-    let new_pos = duplicate(prev_pos);
-    if (change.x){new_pos.x = change.x;}
-    if (change.y){new_pos.y = change.y;}
-    let updates = [];
-
-    let angle = rotate_angle_from_vec(new_pos, prev_pos);
-    // update the tail to point in the direction of the movement.
-    updates.push({_id:token.id, rotation: angle});
-    let tail_ids = [...HEAD_TOKEN.getFlag(MOD_NAME, 'tail_items')];
-    tail_ids.pop();
-    tail_ids.reverse();
-    tail_ids.push(HEAD_ID);
-        
-    for ( let tail_id of tail_ids){
-        let tail = canvas.tokens.get(tail_id);
-        let next_pos = {x:tail.x, y:tail.y};
-        let angle = rotate_angle_from_vec(prev_pos, next_pos);
-        updates.push({
-          _id: tail.id,
-          x : prev_pos.x,
-          y : prev_pos.y,
-          rotation: angle
-        });
-        prev_pos = next_pos;        
-    }
-    canvas.scene.updateEmbeddedDocuments('Token', updates);
+    }    
+    delete updates[0].x; 
+    delete updates[0].y;
+    canvas.scene.updateEmbeddedDocuments('Token', updates, {worm_triggered:true} );
   }
 
-  */
 });
 
 
@@ -282,7 +255,6 @@ Hooks.on('createToken', (token, options, user_id)=>{
   if (!game.user.isGM)return true;
   if (token.getFlag(MOD_NAME, "enabled") && token.getFlag(MOD_NAME, 'length')){
     // We need to create a catepillar
-    console.log("Creating Catepillar", token, options, user_id);
     let len = token.getFlag(MOD_NAME, 'length');
     let tail = [];
     
