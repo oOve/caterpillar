@@ -14,9 +14,6 @@
  const MOD_NAME = "caterpillar";
 
 
-
-
-
 function rotate_angle_from_vec(old_pos, new_pos){
     let diff = {x:new_pos.x-old_pos.x,
                 y:new_pos.y-old_pos.y};
