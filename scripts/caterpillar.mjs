@@ -11,8 +11,18 @@
  ░                 ░              
  */
 
- const MOD_NAME = "caterpillar";
+const MOD_NAME = "caterpillar";
 
+const FLAG_LENGTH  = 'length';
+const FLAG_ENABLED = 'enabled';
+const FLAG_SPACING = 'spacing';
+
+const FLAG_TAIL_INDEX = 'tail_index';
+const FLAG_TAIL_ITEMS = 'tail_items';
+const FLAG_HEAD_ID    = 'head_id';
+
+const FLAG_BODY_TOKEN = 'body_token';
+const FLAG_REAR_TOKEN = 'rear_token';
 
 function rotate_angle_from_vec(old_pos, new_pos){
     let diff = {x:new_pos.x-old_pos.x,
@@ -122,13 +132,13 @@ function prepend(value, array) {
 }
 
 function isHead(token){
-  return token.getFlag(MOD_NAME, 'enabled');
+  return token.getFlag(MOD_NAME, FLAG_ENABLED);
 }
 function isTail(token){
   try{
-    let head = canvas.tokens.get( isHead(token)?token.id: token.getFlag(MOD_NAME, 'head_id'));
-    let length = head.document.getFlag(MOD_NAME, 'length');
-    let index = token.getFlag(MOD_NAME, 'tail_index');
+    let head = canvas.tokens.get( isHead(token)?token.id: token.getFlag(MOD_NAME, FLAG_HEAD_ID));
+    let length = head.document.getFlag(MOD_NAME, FLAG_LENGTH);
+    let index = token.getFlag(MOD_NAME, FLAG_TAIL_INDEX);
     return index == length;
   }
   catch(err){
@@ -158,6 +168,12 @@ console.warn('---------');
 ii = reversableIterator(10);
 for (const i of ii){console.warn(i)}
 */
+function getSpacing(token){
+  let spacing = token.getFlag(MOD_NAME, FLAG_SPACING);
+  if(!spacing){spacing = 1.0;}
+  return spacing*token.data.width*canvas.grid.size;
+}
+
 
 Hooks.on('preUpdateToken', (token, change, options, user_id)=>{ 
   if(!change.x && !change.y){
@@ -172,11 +188,16 @@ Hooks.on('preUpdateToken', (token, change, options, user_id)=>{
   let itail = isTail(token);
 
   if (ihead || itail){    
-    const HEAD_ID = (ihead)?token.id:token.getFlag(MOD_NAME, 'head_id');
-    let head_doc = (ihead)?token: canvas.tokens.get(HEAD_ID).document;
+    const HEAD_ID = (ihead)?token.id:token.getFlag(MOD_NAME, FLAG_HEAD_ID);
+    //let head = (ihead)?token: canvas.tokens.get(HEAD_ID);
+    let head = canvas.tokens.get(HEAD_ID);
+    let head_doc = head.document;
+
+    let spacing = getSpacing(head_doc);
+    let zIndex  = head.zIndex;
 
     // This is either the head or the tail        
-    let tail_ids = head_doc.getFlag(MOD_NAME, 'tail_items');    
+    let tail_ids = head_doc.getFlag(MOD_NAME, FLAG_TAIL_ITEMS);    
     
     let caterpillar = tail_ids.map(id=>canvas.tokens.get(id));
     let positions = caterpillar.map((part)=>{return {x:part.data.x, y:part.data.y};});
@@ -192,7 +213,7 @@ Hooks.on('preUpdateToken', (token, change, options, user_id)=>{
       positions.push(new_pos);
     }
 
-    let stepSize = (caterpillar[0].hitArea.width)/1.5;
+    let stepSize = spacing;
     let spline = new SimpleSpline(positions);
     let updates = [];
 
@@ -205,37 +226,41 @@ Hooks.on('preUpdateToken', (token, change, options, user_id)=>{
       let t = c_iter.next().value;
       let npos = spline.parametricPosition(t);
       let angle = vAngle(spline.derivative(t));
-      if (Number.isNaN(angle)){angle=0;}
-      
+      if (Number.isNaN(angle)){angle=0;}      
+
       let id;
-      if (i==0){     
+      if (i==0){
         id=HEAD_ID;
       }else{
         id=tail_ids[i-1];
       }
+      //
+      canvas.tokens.get(id).zIndex = - positions.length + 1 - i;
+
       updates.push({ 
           _id : id, 
           x: npos.x,
           y: npos.y,
-          rotation: angle
+          rotation: angle,
+          zIndex: -positions.length + 1 - i
         });
-    }    
+    }
+
+    // Remove positional update of the first element in the chain 
+    // (will either be the head or the tail, the end that was dragged.)
     delete updates[0].x; 
     delete updates[0].y;
     canvas.scene.updateEmbeddedDocuments('Token', updates, {worm_triggered:true} );
   }
-
 });
-
-
 
 
 // Delete token
 Hooks.on('deleteToken', (token, options, user_id)=>{
   if (!game.user.isGM)return true;
 
-  if (token.getFlag(MOD_NAME, 'tail_items')){
-    let tail = token.getFlag(MOD_NAME, 'tail_items');
+  if (token.getFlag(MOD_NAME, FLAG_TAIL_ITEMS)){
+    let tail = token.getFlag(MOD_NAME, FLAG_TAIL_ITEMS);
     canvas.scene.deleteEmbeddedDocuments('Token', tail);
   }
 
@@ -243,27 +268,28 @@ Hooks.on('deleteToken', (token, options, user_id)=>{
 
 
 
-
 // Create token
 Hooks.on('createToken', (token, options, user_id)=>{
   if (!game.user.isGM)return true;
-  if (token.getFlag(MOD_NAME, "enabled") && token.getFlag(MOD_NAME, 'length')){
+  if (token.getFlag(MOD_NAME, "enabled") && token.getFlag(MOD_NAME, FLAG_LENGTH)){
+    let spacing = getSpacing(token);
+
     // We need to create a catepillar
-    let len = token.getFlag(MOD_NAME, 'length');
+    let len = token.getFlag(MOD_NAME, FLAG_LENGTH);
     let tail = [];
     
     for (let i = 1; i <= len; ++i){
       let t = duplicate(token);
-      t.y += (i) * canvas.grid.size;
+      t.y +=  spacing * (i);
       t.flags.caterpillar.tail = true;
       t.flags.caterpillar.tail_index = i;
       t.flags.caterpillar.enabled = false;
       t.flags.caterpillar.head_id = token.id
-      t.img = token.getFlag(MOD_NAME, (i<len)?'body_token':'rear_token' );
+      t.img = token.getFlag(MOD_NAME, (i<len)?FLAG_BODY_TOKEN:FLAG_REAR_TOKEN );
       tail.push(t);
     }
     canvas.scene.createEmbeddedDocuments("Token", tail).then((tokens)=>{
-      token.setFlag(MOD_NAME, 'tail_items', tokens.map( tok=>tok.id ) );
+      token.setFlag(MOD_NAME, FLAG_TAIL_ITEMS, tokens.map( tok=>tok.id ) );
     });
   }
 });
@@ -283,7 +309,6 @@ Hooks.on('updateToken', (token, change, options, user_id)=>{
 
 
 
-
 // Settings:
 Hooks.once("init", () => {
   game.settings.register(MOD_NAME, "snap_to_grid", {
@@ -295,6 +320,8 @@ Hooks.once("init", () => {
     default: false
   });
 });
+
+
 
 
 
@@ -347,6 +374,29 @@ function imageSelector( app, flag_name, title ){
   return grp;
 }
 
+function textBoxConfig(parent, app, flag_name, title, type="number",
+                      placeholder=null, default_value=null, step=null){
+  const label = document.createElement('label');
+  label.textContent = title;
+  parent.append(label);
+
+  const input = document.createElement('input');
+  input.name = 'flags.'+MOD_NAME+'.'+flag_name;
+  input.type = type;  
+  if(step) input.step = step;
+  if(placeholder) input.placeholder = placeholder;
+
+  if(app.token.getFlag(MOD_NAME, flag_name)){
+    input.value=app.token.getFlag(MOD_NAME, flag_name);
+  }
+  else if(default_value!=null){
+    input.value = default_value;
+  }
+  parent.append(input);
+}
+
+
+
 
 // Hook into the token config render
 Hooks.on("renderTokenConfig", (app, html) => {
@@ -372,32 +422,21 @@ Hooks.on("renderTokenConfig", (app, html) => {
   enableBox.name = 'flags.'+MOD_NAME+'.enabled';
   enableBox.type = 'checkbox';
   enableBox.title = 'Enable caterpillar control on this token.';
-  if (app.token.getFlag(MOD_NAME, 'enabled')){
+  if (app.token.getFlag(MOD_NAME, FLAG_ENABLED)){
     enableBox.checked = true;
   }
   formFields.append(enableBox);
 
-  const label2 = document.createElement('label');
-  label2.textContent = 'Length';
-  formFields.append(label2);
-  const cat_len = document.createElement('input');
-  cat_len.name = 'flags.'+MOD_NAME+'.length';
-  cat_len.type = 'number';
-  cat_len.step = "1";
-  if(app.token.getFlag(MOD_NAME, 'length')){
-    cat_len.value=app.token.getFlag(MOD_NAME, 'length');
-  }
-  formFields.append(cat_len);
+  textBoxConfig(formFields, app, FLAG_LENGTH, 'Length', 'number', undefined, 10, 1 );
+  textBoxConfig(formFields, app, FLAG_SPACING, 'Spacing', 'number', undefined, .75, .05 );
+ 
+  const cat_body = imageSelector(app, FLAG_BODY_TOKEN, "Token for Caterpillar body");
+  const cat_rear = imageSelector(app, FLAG_REAR_TOKEN, "Token for Caterpillar rear");
   
-  const cat_body = imageSelector(app, 'body_token', "Token for Caterpillar body");
-  const cat_rear = imageSelector(app, 'rear_token', "Token for Caterpillar rear");
-    
   
   // Add the form group to the bottom of the Identity tab
   html[0].querySelector("div[data-tab='character']").append(formGroup);
-  //html[0].querySelector("div[data-tab='character']").append(cat_body);
-  //html[0].querySelector("div[data-tab='character']").append(cat_rear);
-
+  // And add the token image selectors to the 'apperance' tab
   html[0].querySelector("div[data-tab='appearance']").append(cat_body);
   html[0].querySelector("div[data-tab='appearance']").append(cat_rear);
 
