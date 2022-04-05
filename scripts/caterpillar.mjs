@@ -380,7 +380,7 @@ function createLabel(text){
 }
 function createDiv(classes){
   const div = document.createElement('div');
-  for (c of classes){div.classList.add(c);}
+  for (let c of classes){div.classList.add(c);}
   return div;
 }
 
