@@ -14,40 +14,34 @@
  const MOD_NAME = "caterpillar";
 
 
-function rotate_angle_from_vec(old_pos, new_pos){
-    let diff = {x:new_pos.x-old_pos.x,
-                y:new_pos.y-old_pos.y};
-    return 90 + Math.toDegrees( Math.atan2( diff.y, diff.x ) );
-}
 
 
- 
-
-function vNeg(p){
+function vNeg(p){ // Return -1*v
   return {x:-p.x, y:-p.y};
 }
-function vAdd(p1, p2){
+function vAdd(p1, p2){ // Return the sum, p1 + p2
   return {x:p1.x+p2.x, y:p1.y+p2.y };
 }
-function vSub(p1, p2){
+function vSub(p1, p2){// Return the difference, p1-p2
   return {x:p1.x-p2.x, y:p1.y-p2.y };
 }
-function vMult(p,v){
+function vMult(p,v){ // Multiply vector p with value v
   return {x:p.x*v, y: p.y*v};  
 }
-function vDot(p1, p2){
+function vDot(p1, p2){ // Return the dot product of p1 and p2
   return p1.x*p2.x + p1.y*p2.y;
 }
-function vLen(p){
+function vLen(p){ // Return the length of the vector p
   return Math.sqrt(p.x**2 + p.y**2);
 }
-function vNorm(p){
+function vNorm(p){ // Normalize the vector p, p/||p||
   return vMult(p, 1.0/vLen(p));
 }
-function vAngle(p){
+function vAngle(p){ // The foundry compatible 'rotation angle' to point along the vector p
   return 90+Math.toDegrees(Math.atan2(p.y, p.x));
 }
 
+// An implementation of hermite-like interpolation. The derivative is hermite-like, whereas the position is linearly interpolated
 class SimpleSpline{
   constructor(points, smoothness=0.0){
     this.p = points;
@@ -115,12 +109,23 @@ class SimpleSpline{
   }
 }
 
+/**
+ * Prepend value to array 'array'
+ * @param {Number} value the value to prepend
+ * @param {Array} array 
+ * @returns 
+ */
 function prepend(value, array) {
   var newArray = array.slice();
   newArray.unshift(value);
   return newArray;
 }
 
+/**
+ * Return true if this token is a caterpillar 'head'
+ * @param {*} token The token to check whether it is a 'head' token
+ * @returns Boolean
+ */
 function isHead(token){
   return token.getFlag(MOD_NAME, 'enabled');
 }
@@ -136,6 +141,13 @@ function isTail(token){
   }
 }
 
+
+/**
+ * Iterate either from the back in reverse, or from zero towards the length
+ * @param {Number} length The total parametric length, floating point
+ * @param {Number} step Stepsize, also a floating point
+ * @param {Boolean} reverse If true iterate from length towards zero
+ */
 function* catepillarIterator(length, step, reverse=false){
   let p = (reverse)?length:0;
   while (true){
@@ -143,6 +155,11 @@ function* catepillarIterator(length, step, reverse=false){
     p += (reverse)?-step : step;
   }
 }
+/**
+ * Iterate from zero to len-1, or from len-1 to zero
+ * @param {Number} len Iterator size, an integer
+ * @param {Boolean} reverse Iterate down towards zero if true
+ */
 function* reversableIterator(len, reverse=false){
   let start = (reverse)?len-1: 0;
   let step = (reverse)?-1:1;
@@ -151,13 +168,7 @@ function* reversableIterator(len, reverse=false){
     yield i;
   }
 }
-/*
-ri = reversableIterator(10, true);
-for (const i of ri){console.warn(i)}
-console.warn('---------');
-ii = reversableIterator(10);
-for (const i of ii){console.warn(i)}
-*/
+
 
 Hooks.on('preUpdateToken', (token, change, options, user_id)=>{ 
   if(!change.x && !change.y){
@@ -165,6 +176,7 @@ Hooks.on('preUpdateToken', (token, change, options, user_id)=>{
     return;
   }
   if (options.worm_triggered){
+    // We exit, to not trigger on 'triggered' movement
     return true;
   }  
 
@@ -197,7 +209,6 @@ Hooks.on('preUpdateToken', (token, change, options, user_id)=>{
     let updates = [];
 
     // This is the head
-    //updates.push({_id: token.id, rotation: vAngle(spline.derivative(0)) });
     let c_iter = catepillarIterator(spline.plen, stepSize, itail);
     let i_iter = reversableIterator(positions.length, itail);
     
@@ -219,9 +230,11 @@ Hooks.on('preUpdateToken', (token, change, options, user_id)=>{
           y: npos.y,
           rotation: angle
         });
-    }    
+    }
+    // Delete the manually moved tokens' (head or tail) movement (it still keeps its manual target)
     delete updates[0].x; 
     delete updates[0].y;
+    // Execute all the accumulated updates, but mark these as "worm_triggered" to not trigger this again
     canvas.scene.updateEmbeddedDocuments('Token', updates, {worm_triggered:true} );
   }
 
@@ -267,19 +280,6 @@ Hooks.on('createToken', (token, options, user_id)=>{
     });
   }
 });
-
-
-
-// Let's grab those token updates
-/*
-Hooks.on('updateToken', (token, change, options, user_id)=>{
-  if (!game.user.isGM)return true;
-  if (token.getFlag(MOD_NAME, "enabled")){
-    // Go on and move its body.
-  }  
-});
-*/
-
 
 
 
@@ -347,25 +347,32 @@ function imageSelector( app, flag_name, title ){
   return grp;
 }
 
+function createLabel(text){
+  const label = document.createElement('label');
+  label.textContent = text;
+  return label;
+}
+function createDiv(classes){
+  const div = document.createElement('div');
+  for (c of classes){div.classList.add(c);}
+  return div;
+}
+
 
 // Hook into the token config render
 Hooks.on("renderTokenConfig", (app, html) => {
     
   // Create a new form group
-  const formGroup = document.createElement("div");
-  formGroup.classList.add("form-group");
-  formGroup.classList.add("slim");
+  const formGroup = createDiv(["form-group","slim"]);
   // Create a label for this setting
-  const label = document.createElement("label");
-  label.textContent = "Caterpillar";
+  const label = createLabel("Caterpillar");
   formGroup.prepend(label);
 
   // Create a form fields container
-  const formFields = document.createElement("div");
-  formFields.classList.add("form-fields");
+  const formFields = createDiv(["form-fields"]);
   formGroup.append(formFields);
-  const label1 = document.createElement('label');
-  label1.textContent = "Enable";
+
+  const label1 = createLabel("Enable");
   formFields.append(label1);
 
   const enableBox = document.createElement("input");
@@ -395,8 +402,6 @@ Hooks.on("renderTokenConfig", (app, html) => {
   
   // Add the form group to the bottom of the Identity tab
   html[0].querySelector("div[data-tab='character']").append(formGroup);
-  //html[0].querySelector("div[data-tab='character']").append(cat_body);
-  //html[0].querySelector("div[data-tab='character']").append(cat_rear);
 
   html[0].querySelector("div[data-tab='appearance']").append(cat_body);
   html[0].querySelector("div[data-tab='appearance']").append(cat_rear);
