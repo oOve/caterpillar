@@ -2,9 +2,9 @@
     "name": "caterpillar",
     "title": "Caterpillar, and other looong mobs",
     "description": "Adds a token config to create long and connected monsters, as a series of tokens that follow each other.",
-    "version": "0.0.1.V8",
-    "minimumCoreVersion": "8",
-    "compatibleCoreVersion": "8",
+    "version": "0.0.2.V8",
+    "minimumCoreVersion": "0.8",
+    "compatibleCoreVersion": "0.8",
     "author": "Dr. O_o",
     "authors": [{
         "name": "Dr. O_o",
@@ -15,8 +15,8 @@
     "socket": false,
     "esmodules": ["./scripts/caterpillar.mjs"],    
     "url": "https://github.com/oOve/caterpillar",
-    "download": "https://github.com/oOve/caterpillar/archive/0.0.1.V8.zip",
-    "manifest": "https://github.com/oOve/caterpillar/releases/latest/download/module.json",
+    "download": "https://github.com/oOve/caterpillar/archive/0.0.2.V8.zip",
+    "manifest": "https://github.com/oOve/caterpillar/releases/download/0.0.2.V8/module.json",
 
     "license": "LICENSE",
     "readme": "README.md",
