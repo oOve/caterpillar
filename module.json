@@ -21,6 +21,13 @@
     "license": "LICENSE",
     "readme": "README.md",
     "styles":[],
-    "packs": [],
+    "packs": [
+        {
+            "name": "caterpillar",
+            "label": "Caterpillars",
+            "path": "./packs/caterpillar.db",
+            "type": "Actor"
+        }
+    ],
     "library": false
   }
