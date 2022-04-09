@@ -29,5 +29,12 @@
             "type": "Actor"
         }
     ],
+    "media": [
+        {
+          "type": "cover",
+          "url": "https://github.com/oOve/caterpillar/tree/main/media/cover.png",
+          "caption": "Caterpillar - loong mobs"
+        }
+    ],
     "library": false
   }
