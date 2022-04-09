@@ -1,4 +1,5 @@
 # caterpillar
+![](./media/cover.png)
 Foundry module for creating snakes, looong monsters,(or even players?) . Modify a token, drag it onto the canvas and it automatically creates a head and many body segments. Move its head and the body follows.
 
 <img src="media/caterpillar.png" width=600>
