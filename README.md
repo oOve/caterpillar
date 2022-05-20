@@ -9,6 +9,10 @@ Change over to the appearance tab (#3), and select images for the body and rear 
 
 Drag your actor onto the scene, and it will automatically generate all the tail tokens.
 
+
+![ezgif-3-8b8ac8a7fc](https://user-images.githubusercontent.com/8543541/169615377-8be4f069-b125-4a87-8c47-2f205c0e6de5.gif)
+
+
 ## Demonstration:
 
 [![Caterpillar](http://img.youtube.com/vi/U4Kku983B4k/0.jpg)](http://www.youtube.com/watch?v=U4Kku983B4k "Caterpillar")
