@@ -10,6 +10,8 @@
    ░       ░       ░         ░ ░  
  ░                 ░              
  */
+import * as utils from "./utils.mjs"
+import { createSpider, moveSpider, rotateSpider } from "./spider.mjs";
 
 const MOD_NAME = "caterpillar";
 
@@ -25,7 +27,7 @@ const FLAG_BODY_TOKEN = 'body_token';
 const FLAG_REAR_TOKEN = 'rear_token';
 
 
-
+/*
 function vNeg(p){ // Return -1*v
   return {x:-p.x, y:-p.y};
 }
@@ -118,6 +120,8 @@ class SimpleSpline{
     return this.#iNorm(this.len);
   }
 }
+*/
+
 
 /**
  * Prepend value to array 'array'
@@ -186,15 +190,25 @@ function getSpacing(token){
 }
 
 
+
+
 Hooks.on('preUpdateToken', (token, change, options, user_id)=>{ 
-  if(!change.x && !change.y){
+  if(change.x === undefined && change.y === undefined && change.rotation === undefined){
     // No change that modifies the caterpillar
-    return;
+    return true;
   }
-  if (options.worm_triggered){
+  if (options.worm_triggered || options.spiderTriggered){
     // We exit, to not trigger on 'triggered' movement
     return true;
-  }  
+  }
+
+  if(token.getFlag(MOD_NAME, 'isSpider')){
+    if (change.rotation!=undefined){
+      return rotateSpider(token,change);
+    }else{
+      return moveSpider(token,change);
+    }
+  }
 
   let ihead = isHead(token);
   let itail = isTail(token);
@@ -226,7 +240,7 @@ Hooks.on('preUpdateToken', (token, change, options, user_id)=>{
     }
 
     let stepSize = spacing;
-    let spline = new SimpleSpline(positions);
+    let spline = new utils.SimpleSpline(positions);
     let updates = [];
 
     // This is the head
@@ -236,7 +250,7 @@ Hooks.on('preUpdateToken', (token, change, options, user_id)=>{
     for (const i of i_iter){
       let t = c_iter.next().value;
       let npos = spline.parametricPosition(t);
-      let angle = vAngle(spline.derivative(t));
+      let angle = utils.vAngle(spline.derivative(t));
       if (Number.isNaN(angle)){angle=0;}      
 
       let id;
@@ -276,6 +290,10 @@ Hooks.on('deleteToken', (token, options, user_id)=>{
     canvas.scene.deleteEmbeddedDocuments('Token', tail);
   }
 
+  if (token.getFlag(MOD_NAME, 'isSpider')){
+    canvas.scene.deleteEmbeddedDocuments('Token', token.getFlag(MOD_NAME, 'spiderLegs'));
+  }
+
 });
 
 
@@ -304,6 +322,12 @@ Hooks.on('createToken', (token, options, user_id)=>{
       token.setFlag(MOD_NAME, FLAG_TAIL_ITEMS, tokens.map( tok=>tok.id ) );
     });
   }
+
+  if (token.getFlag(MOD_NAME, "isSpider")){
+    console.warn("Spidertiem!!");
+    createSpider(token);
+  }
+
 });
 
 
