@@ -186,7 +186,7 @@ function* reversableIterator(len, reverse=false){
 function getSpacing(token){
   let spacing = token.getFlag(MOD_NAME, FLAG_SPACING);
   if(!spacing){spacing = 1.0;}
-  return spacing*token.data.width*canvas.grid.size;
+  return spacing*token.width*canvas.grid.size;
 }
 
 
@@ -226,9 +226,9 @@ Hooks.on('preUpdateToken', (token, change, options, user_id)=>{
     let tail_ids = head_doc.getFlag(MOD_NAME, FLAG_TAIL_ITEMS);    
     
     let caterpillar = tail_ids.map(id=>canvas.tokens.get(id));
-    let positions = caterpillar.map((part)=>{return {x:part.data.x, y:part.data.y};});
+    let positions = caterpillar.map((part)=>{return {x:part.x, y:part.y};});
 
-    let prev_pos = {x:token.data.x, y:token.data.y};
+    let prev_pos = {x:token.x, y:token.y};
     let new_pos = duplicate(prev_pos);
     if (change.x){new_pos.x = change.x;}
     if (change.y){new_pos.y = change.y;}
@@ -383,8 +383,8 @@ function imageSelector( app, flag_name, title ){
   inpt.title = title;
   inpt.placeholder = "path/image.png";
   // Insert the flags current value into the input box  
-  if (app.token.getFlag(MOD_NAME, flag_name)){
-    inpt.value=app.token.getFlag(MOD_NAME, flag_name);
+  if (app.token.flags?.[MOD_NAME]?.[flag_name]){
+    inpt.value=app.token.flags?.[MOD_NAME]?.[flag_name];
   }
   
   button.append(bi);
@@ -418,8 +418,8 @@ function textBoxConfig(parent, app, flag_name, title, type="number",
   if(step) input.step = step;
   if(placeholder) input.placeholder = placeholder;
 
-  if(app.token.getFlag(MOD_NAME, flag_name)){
-    input.value=app.token.getFlag(MOD_NAME, flag_name);
+  if(app.token.flags?.[MOD_NAME]?.[flag_name]){
+    input.value=app.token.flags?.[MOD_NAME]?.[flag_name];
   }
   else if(default_value!=null){
     input.value = default_value;
@@ -432,7 +432,9 @@ function textBoxConfig(parent, app, flag_name, title, type="number",
 
 // Hook into the token config render
 Hooks.on("renderTokenConfig", (app, html) => {
-    
+
+  // if ( !app.isPrototype) return;
+
   // Create a new form group
   const formGroup = createDiv(["form-group","slim"]);
   // Create a label for this setting
@@ -450,7 +452,7 @@ Hooks.on("renderTokenConfig", (app, html) => {
   enableBox.name = 'flags.'+MOD_NAME+'.enabled';
   enableBox.type = 'checkbox';
   enableBox.title = 'Enable caterpillar control on this token.';
-  if (app.token.getFlag(MOD_NAME, FLAG_ENABLED)){
+  if (app.token.flags?.[MOD_NAME]?.[FLAG_ENABLED]){
     enableBox.checked = true;
   }
   formFields.append(enableBox);
