@@ -27,102 +27,6 @@ const FLAG_BODY_TOKEN = 'body_token';
 const FLAG_REAR_TOKEN = 'rear_token';
 
 
-/*
-function vNeg(p){ // Return -1*v
-  return {x:-p.x, y:-p.y};
-}
-function vAdd(p1, p2){ // Return the sum, p1 + p2
-  return {x:p1.x+p2.x, y:p1.y+p2.y };
-}
-function vSub(p1, p2){// Return the difference, p1-p2
-  return {x:p1.x-p2.x, y:p1.y-p2.y };
-}
-function vMult(p,v){ // Multiply vector p with value v
-  return {x:p.x*v, y: p.y*v};  
-}
-function vDot(p1, p2){ // Return the dot product of p1 and p2
-  return p1.x*p2.x + p1.y*p2.y;
-}
-function vLen(p){ // Return the length of the vector p
-  return Math.sqrt(p.x**2 + p.y**2);
-}
-function vNorm(p){ // Normalize the vector p, p/||p||
-  return vMult(p, 1.0/vLen(p));
-}
-function vAngle(p){ // The foundry compatible 'rotation angle' to point along the vector p
-  return 90+Math.toDegrees(Math.atan2(p.y, p.x));
-}
-
-// An implementation of hermite-like interpolation. The derivative is hermite-like, whereas the position is linearly interpolated
-class SimpleSpline{
-  constructor(points, smoothness=0.0){
-    this.p = points;
-    this.smoothness = smoothness;
-    this.lengths = [];
-    for (let i = 1; i < this.len; ++i){
-      this.lengths.push( vLen(vSub(this.p[i-1], this.p[i])) );
-    }
-  }
-  parametricLength(){
-    return this.lengths.reduce((p, a)=>p+a,0);
-  }
-  get len (){
-    return this.p.length;
-  }
-  get plen(){
-    return this.parametricLength();
-  }
-
-  // Position at parametric position t
-  parametricPosition( t ){
-    if (this.len<2){return this.p[0];}    
-    let len = 0;
-    for (let i = 1; i < this.len; ++i){
-      let nlen = this.lengths[i-1];
-      if (len+nlen >= t){
-        let nfrac = (t-len)/(nlen);//normalized fraction
-        // returning (1-nt)*prev + nt*cur
-        return vAdd(vMult(this.p[i-1], 1-nfrac), vMult(this.p[i], nfrac) );
-      }
-      len += nlen;
-    }
-    // we have gone past our parametric length, clamp at last point
-    return this.p[this.len-1];
-  }
-
-  #iNorm(i){
-    if(i<1){
-      return vNorm(vSub(this.p[0], this.p[1]));
-    }
-    if(i > (this.len-2)){
-      // last (or past last) point, return (last - next to last)
-      return vNorm(vSub(this.p[this.len-2], this.p[this.len-1]));
-    }
-    return vNorm( vSub(this.p[i-1], this.p[i+1]));
-  }
-
-  // Derivative at parametric position t
-  derivative(t){
-    if (t<=0){ 
-      return this.#iNorm(0);
-    }
-    let len = 0;
-    for (let i = 1; i < this.len; ++i){
-      let nlen = this.lengths[i-1];
-      if ((len+nlen) >= t){
-        let nfrac = (t-len)/(nlen);//normalized fraction
-        let p = this.#iNorm(i-1);
-        let n = this.#iNorm(i);
-        return vNorm( vAdd(vMult(p,1-nfrac), vMult(n,nfrac)) );
-      }
-      len += nlen;
-    }
-    return this.#iNorm(this.len);
-  }
-}
-*/
-
-
 /**
  * Prepend value to array 'array'
  * @param {Number} value the value to prepend
@@ -186,7 +90,11 @@ function* reversableIterator(len, reverse=false){
 function getSpacing(token){
   let spacing = token.getFlag(MOD_NAME, FLAG_SPACING);
   if(!spacing){spacing = 1.0;}
-  return spacing*token.width*canvas.grid.size;
+  let w = token.width;
+  
+  // V10 compatibility
+  if (w===undefined) w = token.data.width;
+  return spacing*w*canvas.grid.size;
 }
 
 
@@ -203,11 +111,8 @@ Hooks.on('preUpdateToken', (token, change, options, user_id)=>{
   }
 
   if(token.getFlag(MOD_NAME, 'isSpider')){
-    if (change.rotation!=undefined){
-      return rotateSpider(token,change);
-    }else{
-      return moveSpider(token,change);
-    }
+    if (change.rotation!=undefined){return rotateSpider(token,change);
+    }else{                          return moveSpider(token,change); }
   }
 
   let ihead = isHead(token);
@@ -228,7 +133,9 @@ Hooks.on('preUpdateToken', (token, change, options, user_id)=>{
     let caterpillar = tail_ids.map(id=>canvas.tokens.get(id));
     let positions = caterpillar.map((part)=>{return {x:part.x, y:part.y};});
 
-    let prev_pos = {x:token.x, y:token.y};
+    let tdata = (token.document!=undefined)?token.document.data:token.data;
+
+    let prev_pos = {x:tdata.x, y:tdata.y};
     let new_pos = duplicate(prev_pos);
     if (change.x){new_pos.x = change.x;}
     if (change.y){new_pos.y = change.y;}
@@ -352,6 +259,9 @@ Hooks.once("init", () => {
 function imageSelector( app, flag_name, title ){
   let data_path = 'flags.'+MOD_NAME+'.'+flag_name;
   
+  let flags = app.token.flags;
+  if (flags === undefined) flags = app.token.data.flags;
+  
   let grp = document.createElement('div');
   grp.classList.add('form-group');
   let label = document.createElement('label');
@@ -383,8 +293,8 @@ function imageSelector( app, flag_name, title ){
   inpt.title = title;
   inpt.placeholder = "path/image.png";
   // Insert the flags current value into the input box  
-  if (app.token.flags?.[MOD_NAME]?.[flag_name]){
-    inpt.value=app.token.flags?.[MOD_NAME]?.[flag_name];
+  if (flags?.[MOD_NAME]?.[flag_name]){
+    inpt.value=flags?.[MOD_NAME]?.[flag_name];
   }
   
   button.append(bi);
@@ -410,7 +320,10 @@ function createDiv(classes){
 
 function textBoxConfig(parent, app, flag_name, title, type="number",
                        placeholder=null, default_value=null, step=null)
-{  
+{ 
+  let flags = app.token.flags;
+  if (flags === undefined) flags = app.token.data.flags;
+
   parent.append(createLabel(title));
   const input = document.createElement('input');
   input.name = 'flags.'+MOD_NAME+'.'+flag_name;
@@ -418,8 +331,8 @@ function textBoxConfig(parent, app, flag_name, title, type="number",
   if(step) input.step = step;
   if(placeholder) input.placeholder = placeholder;
 
-  if(app.token.flags?.[MOD_NAME]?.[flag_name]){
-    input.value=app.token.flags?.[MOD_NAME]?.[flag_name];
+  if(flags?.[MOD_NAME]?.[flag_name]){
+    input.value=flags?.[MOD_NAME]?.[flag_name];
   }
   else if(default_value!=null){
     input.value = default_value;
@@ -432,8 +345,11 @@ function textBoxConfig(parent, app, flag_name, title, type="number",
 
 // Hook into the token config render
 Hooks.on("renderTokenConfig", (app, html) => {
-
+  window.MM = app
   // if ( !app.isPrototype) return;
+
+  let flags = app.token.flags;
+  if (flags === undefined) flags = app.token.data.flags;
 
   // Create a new form group
   const formGroup = createDiv(["form-group","slim"]);
@@ -452,7 +368,7 @@ Hooks.on("renderTokenConfig", (app, html) => {
   enableBox.name = 'flags.'+MOD_NAME+'.enabled';
   enableBox.type = 'checkbox';
   enableBox.title = 'Enable caterpillar control on this token.';
-  if (app.token.flags?.[MOD_NAME]?.[FLAG_ENABLED]){
+  if (flags?.[MOD_NAME]?.[FLAG_ENABLED]){
     enableBox.checked = true;
   }
   formFields.append(enableBox);
