@@ -133,7 +133,8 @@ Hooks.on('preUpdateToken', (token, change, options, user_id)=>{
     let caterpillar = tail_ids.map(id=>canvas.tokens.get(id));
     let positions = caterpillar.map((part)=>{return {x:part.x, y:part.y};});
 
-    let tdata = (token.document!=undefined)?token.document.data:token;
+    // V10 Compat
+    let tdata = (Number(game.version)>10)?token:token.data;
 
     let prev_pos = {x:tdata.x, y:tdata.y};
     let new_pos = duplicate(prev_pos);
