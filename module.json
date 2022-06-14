@@ -12,6 +12,7 @@
         "patreon": "https://www.patreon.com/drO_o"
         }],
     "dependencies":[],
+    "relationships": {},
     "socket": false,
     "esmodules": ["./scripts/caterpillar.mjs"],    
     "url": "https://github.com/oOve/caterpillar",

@@ -346,9 +346,8 @@ function textBoxConfig(parent, app, flag_name, title, type="number",
 
 // Hook into the token config render
 Hooks.on("renderTokenConfig", (app, html) => {
-  window.MM = app
-  // if ( !app.isPrototype) return;
-
+  if (!game.user.isGM) return;
+  
   let flags = app.token.flags;
   if (flags === undefined) flags = app.token.data.flags;
 
